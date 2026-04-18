@@ -200,14 +200,14 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Cancel software auto-off if the hood's own stop-timer became active
         # (C++ comment: "we can not have 2 timers running") or if the fan
         # has been turned off by other means.
-        #if self._auto_off_task and not self._auto_off_task.done():
-        #    device_timer_active = state.get("stopping") and state.get("timer_seconds", 0) > 0
-        #    fan_is_off = state.get("fan_state") is False
-        #    if device_timer_active or fan_is_off:
-        #        _LOGGER.debug("Auto-off cancelled (device_timer=%s fan_off=%s)", device_timer_active, fan_is_off)
-        #        self._auto_off_task.cancel()
-        #        self._auto_off_task = None
-        #        self.data["auto_off_seconds"] = 0
+        if self._auto_off_task and not self._auto_off_task.done():
+            device_timer_active = state.get("stopping") and state.get("timer_seconds", 0) > 0
+            fan_is_off = state.get("fan_state") is False
+            if device_timer_active or fan_is_off:
+                _LOGGER.debug("Auto-off cancelled (device_timer=%s fan_off=%s)", device_timer_active, fan_is_off)
+                self._auto_off_task.cancel()
+                self._auto_off_task = None
+                self.data["auto_off_seconds"] = 0
         self.async_set_updated_data(self.data)
 
     def start_auto_off(self, duration_seconds: int) -> None:
