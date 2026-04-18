@@ -1,0 +1,94 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Novy Pureline Pro",
+        "description": "Select a nearby Pureline Pro device or choose to enter a MAC address manually.",
+        "data": {
+          "address": "Device"
+        }
+      },
+      "manual": {
+        "title": "Enter MAC Address",
+        "description": "Enter the Bluetooth MAC address of your Novy Pureline Pro extractor hood.",
+        "data": {
+          "address": "Bluetooth MAC Address"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Found Novy Pureline Pro",
+        "description": "Do you want to add **{name}** ({address})?"
+      }
+    },
+    "error": {
+      "invalid_mac": "Invalid Bluetooth MAC address format. Expected format: AA:BB:CC:DD:EE:FF"
+    },
+    "abort": {
+      "already_configured": "This device is already configured.",
+      "no_devices_found": "No Pureline Pro devices found nearby.",
+      "not_supported": "This device is not a supported Novy Pureline Pro."
+    }
+  },
+  "entity": {
+    "fan": {
+      "extractor_fan": {
+        "name": "Fan"
+      }
+    },
+    "light": {
+      "extractor_light": {
+        "name": "Light"
+      }
+    },
+    "button": {
+      "power_toggle": {
+        "name": "Power Toggle"
+      },
+      "delayed_off": {
+        "name": "Delayed Off"
+      },
+      "set_default_light": {
+        "name": "Set Default Light"
+      },
+      "set_default_speed": {
+        "name": "Set Default Fan Speed"
+      },
+      "ambi_light": {
+        "name": "Ambi Light"
+      },
+      "white_light": {
+        "name": "White Light"
+      },
+      "reset_grease_filter": {
+        "name": "Reset Grease Filter"
+      }
+    },
+    "switch": {
+      "recirculate": {
+        "name": "Recirculate"
+      }
+    },
+    "sensor": {
+      "off_timer": {
+        "name": "Off Timer"
+      },
+      "boost_timer": {
+        "name": "Boost Timer"
+      },
+      "grease_filter_timer": {
+        "name": "Grease Filter Timer"
+      },
+      "operating_hours_fan": {
+        "name": "Fan Operating Hours"
+      },
+      "operating_hours_led": {
+        "name": "LED Operating Hours"
+      }
+    },
+    "binary_sensor": {
+      "clean_grease_filter": {
+        "name": "Clean Grease Filter"
+      }
+    }
+  }
+}

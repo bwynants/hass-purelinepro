@@ -1,0 +1,28 @@
+{
+  "domain": "novy_pureline_pro",
+  "name": "Novy Pureline Pro",
+  "version": "1.0.0",
+  "documentation": "https://github.com/yourusername/purelinepro-ha",
+  "issue_tracker": "https://github.com/yourusername/purelinepro-ha/issues",
+  "codeowners": ["@yourusername"],
+  "iot_class": "local_push",
+  "bluetooth": [
+    {
+      "service_uuid": "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+    },
+    {
+      "local_name": "Pureline"
+    },
+    {
+      "local_name": "Pureline Pro"
+    },
+    {
+      "local_name": "PurelinePro"
+    }
+  ],
+  "dependencies": ["bluetooth"],
+  "requirements": [],
+  "config_flow": true,
+  "integration_type": "device",
+  "loggers": ["novy_pureline_pro", "purelinepro_ble"]
+}
