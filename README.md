@@ -21,7 +21,7 @@ Tested with Novy Pureline Pro and Novy Cloud extractor
 No additional Python packages are required (`requirements: []` in `manifest.json`). `bleak` and `bleak_retry_connector` are bundled with HA.
 ### Manual installation
 
-1. **HACS**: Add this repository (`eigger/hass-purelinepro`) to HACS as a custom repository
+1. **HACS**: Add this repository (`bwynants/hass-purelinepro`) to HACS as a custom repository
 
 ### Manual installation
 
