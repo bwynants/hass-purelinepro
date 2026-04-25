@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import logging
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
@@ -14,7 +15,9 @@ from homeassistant.components.bluetooth import (
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_ADDRESS
 
-from .const import DOMAIN, UART_SERVICE_UUID
+from .const import UART_SERVICE_UUID
+
+_LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .coordinator import PurelineProConfigEntry
@@ -37,6 +40,7 @@ def _is_pureline_device(info: BluetoothServiceInfoBleak) -> bool:
     if UART_SERVICE_UUID.lower() in [s.lower() for s in info.service_uuids]:
         return True
     name = (info.name or "").lower()
+    _LOGGER.debug("name %s at %s", name, info.address)
     return name.startswith("pureline")
 
 

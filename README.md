@@ -61,6 +61,7 @@ If the hood is advertising and HA's Bluetooth integration can see it, a discover
 
 The config entry is keyed by BT address; duplicate entries for the same address are rejected.
 
+if you have a novy extractor hood but it returns another name (not pureline pro) the Bluetooth MAC address can be obtaind from the log by enableing debug logging. Add the address manually. If really compatible please report the name to me so i can add it for auto discovery...
 ---
 
 ## Enabling Debug Logging
