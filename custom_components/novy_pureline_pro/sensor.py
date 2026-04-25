@@ -70,7 +70,8 @@ class OffTimerSensor(_BaseSensor):
     the device's own stop-timer (``stopping`` flag in Packet400).
     """
     _attr_translation_key = "off_timer"
-    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_suggested_display_precision = 1
     _attr_icon = "mdi:timer-off-outline"
 
     def __init__(self, coordinator: PurelineProCoordinator, entry: PurelineProConfigEntry) -> None:
@@ -81,10 +82,11 @@ class OffTimerSensor(_BaseSensor):
         # Software countdown (delayed-off button) takes precedence.
         auto_off = self.coordinator.data.get("auto_off_seconds", 0)
         if auto_off:
-            return auto_off
+            return auto_off / 60
         # Fall back to the device's own stop-timer.
         if self.coordinator.data.get("stopping"):
-            return self.coordinator.data.get("timer_seconds", 0)
+            value = self.coordinator.data.get("timer_seconds", 0)
+            return value / 60 if value is not None else None
         return 0
 
 
@@ -92,7 +94,8 @@ class BoostTimerSensor(_BaseSensor):
     """Seconds remaining in boost mode."""
 
     _attr_translation_key = "boost_timer"
-    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_suggested_display_precision = 1
     _attr_icon = "mdi:timer-outline"
 
     def __init__(self, coordinator: PurelineProCoordinator, entry: PurelineProConfigEntry) -> None:
@@ -103,14 +106,16 @@ class BoostTimerSensor(_BaseSensor):
         boost = self.coordinator.data.get("boost", False)
         if not boost:
             return 0
-        return self.coordinator.data.get("timer_seconds", 0)
+        value = self.coordinator.data.get("timer_seconds", 0)
+        return value / 60 if value is not None else None
 
 
 class GreaseTimerSensor(_BaseSensor):
     """Minutes until the grease filter needs cleaning."""
 
     _attr_translation_key = "grease_filter_timer"
-    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_suggested_display_precision = 1
     _attr_icon = "mdi:filter-outline"
 
     def __init__(self, coordinator: PurelineProCoordinator, entry: PurelineProConfigEntry) -> None:
@@ -118,14 +123,16 @@ class GreaseTimerSensor(_BaseSensor):
 
     @property
     def native_value(self) -> int | None:
-        return self.coordinator.data.get("grease_minutes")
+        value = self.coordinator.data.get("grease_minutes")
+        return value / 60 if value is not None else None
 
 
 class OperatingHoursFanSensor(_BaseSensor):
     """Total fan operating time in minutes."""
 
     _attr_translation_key = "operating_hours_fan"
-    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_suggested_display_precision = 0
     _attr_icon = "mdi:fan-clock"
 
     def __init__(self, coordinator: PurelineProCoordinator, entry: PurelineProConfigEntry) -> None:
@@ -133,14 +140,18 @@ class OperatingHoursFanSensor(_BaseSensor):
 
     @property
     def native_value(self) -> int | None:
-        return self.coordinator.data.get("fan_operating_minutes")
+        value = self.coordinator.data.get("fan_operating_minutes")
+        return value / 60 if value is not None else None
+
+
 
 
 class OperatingHoursLEDSensor(_BaseSensor):
     """Total LED operating time in minutes."""
 
     _attr_translation_key = "operating_hours_led"
-    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_suggested_display_precision = 0
     _attr_icon = "mdi:led-on"
 
     def __init__(self, coordinator: PurelineProCoordinator, entry: PurelineProConfigEntry) -> None:
@@ -148,4 +159,6 @@ class OperatingHoursLEDSensor(_BaseSensor):
 
     @property
     def native_value(self) -> int | None:
-        return self.coordinator.data.get("led_operating_minutes")
+        value = self.coordinator.data.get("led_operating_minutes")
+        return value / 60 if value is not None else None
+
