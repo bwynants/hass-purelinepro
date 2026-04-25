@@ -1,0 +1,94 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Novy Pureline Pro instellen",
+        "description": "Selecteer een nabijgelegen Pureline Pro-dampkap of kies om handmatig een MAC-adres in te voeren.",
+        "data": {
+          "address": "Apparaat"
+        }
+      },
+      "manual": {
+        "title": "MAC-adres invoeren",
+        "description": "Voer het Bluetooth MAC-adres van je Novy Pureline Pro dampkap in.",
+        "data": {
+          "address": "Bluetooth MAC-adres"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Novy Pureline Pro gevonden",
+        "description": "Wil je **{name}** ({address}) toevoegen?"
+      }
+    },
+    "error": {
+      "invalid_mac": "Ongeldig Bluetooth MAC-adresformaat. Verwacht formaat: AA:BB:CC:DD:EE:FF"
+    },
+    "abort": {
+      "already_configured": "Dit apparaat is al geconfigureerd.",
+      "no_devices_found": "Geen Pureline Pro-apparaten in de buurt gevonden.",
+      "not_supported": "Dit apparaat is geen ondersteunde Novy Pureline Pro."
+    }
+  },
+  "entity": {
+    "fan": {
+      "extractor_fan": {
+        "name": "Ventilator"
+      }
+    },
+    "light": {
+      "extractor_light": {
+        "name": "Verlichting"
+      }
+    },
+    "button": {
+      "power_toggle": {
+        "name": "Aan/uit schakelen"
+      },
+      "delayed_off": {
+        "name": "Uitgesteld uitschakelen"
+      },
+      "set_default_light": {
+        "name": "Standaardverlichting instellen"
+      },
+      "set_default_speed": {
+        "name": "Standaard ventilatorsnelheid instellen"
+      },
+      "ambi_light": {
+        "name": "Sfeerverlichting"
+      },
+      "white_light": {
+        "name": "Wit licht"
+      },
+      "reset_grease_filter": {
+        "name": "Vetfilter resetten"
+      }
+    },
+    "switch": {
+      "recirculate": {
+        "name": "Recirculeren"
+      }
+    },
+    "sensor": {
+      "off_timer": {
+        "name": "Uitschakeltimer"
+      },
+      "boost_timer": {
+        "name": "Boost timer"
+      },
+      "grease_filter_timer": {
+        "name": "Vetfilter timer"
+      },
+      "operating_hours_fan": {
+        "name": "Bedrijfsuren ventilator"
+      },
+      "operating_hours_led": {
+        "name": "Bedrijfsuren LED"
+      }
+    },
+    "binary_sensor": {
+      "clean_grease_filter": {
+        "name": "Vetfilter reinigen"
+      }
+    }
+  }
+}
