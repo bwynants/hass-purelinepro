@@ -11,7 +11,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CMD_FAN_RECIRCULATE, DOMAIN
+from .const import CMD_HOOD_STATUS_402, CMD_FAN_RECIRCULATE, DOMAIN
 
 if TYPE_CHECKING:
     from .coordinator import PurelineProConfigEntry, PurelineProCoordinator
@@ -75,8 +75,9 @@ class RecirculateSwitchEntity(_BaseSwitch):
     async def async_turn_on(self, **kwargs: Any) -> None:
         # C++ sends {1, state}: [25;1;1]
         await self.coordinator.send_command(CMD_FAN_RECIRCULATE, 1, 1)
+        await self.coordinator.send_command(CMD_HOOD_STATUS_402, 0)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         # C++ sends {1, state}: [25;1;0]
         await self.coordinator.send_command(CMD_FAN_RECIRCULATE, 1, 0)
-
+        await self.coordinator.send_command(CMD_HOOD_STATUS_402, 0)

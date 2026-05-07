@@ -10,7 +10,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CMD_FAN_SPEED, CMD_FAN_STATE, DOMAIN
+from .const import CMD_HOOD_STATUS, CMD_FAN_SPEED, CMD_FAN_STATE, DOMAIN
 
 if TYPE_CHECKING:
     from .coordinator import PurelineProConfigEntry, PurelineProCoordinator
@@ -65,24 +65,29 @@ class ExtractorFanEntity(CoordinatorEntity["PurelineProCoordinator"], FanEntity)
         speed = self.coordinator.data.get("fan_speed")
         return int(speed) if speed is not None else None
 
-    async def async_turn_on(
-        self,
-        percentage: int | None = None,
-        preset_mode: str | None = None,
-        **kwargs: Any,
-    ) -> None:
+    async def async_turn_on(self,  percentage: int | None = None,  preset_mode: str | None = None,  **kwargs: Any) -> None:
         speed = percentage or self.coordinator.data.get("fan_speed") or 50
         # C++ sends {1, state} and {1, speed}: [29;1;1] and [28;1;speed]
-        await self.coordinator.send_command(CMD_FAN_STATE, 1, 1)
-        await self.coordinator.send_command(CMD_FAN_SPEED, 1, speed)
+        if not self.coordinator.data.get("fan_state"):
+            await self.coordinator.send_command(CMD_FAN_STATE, 1, 1)
+        if speed != self.coordinator.data.get("fan_speed"):
+            await self.coordinator.send_command(CMD_FAN_SPEED, 1, speed)
+    
+        await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        # C++ sends {1, 0}: [29;1;0]
-        await self.coordinator.send_command(CMD_FAN_STATE, 1, 0)
+        if self.coordinator.data.get("fan_state"):
+            # C++ sends {1, 0}: [29;1;0]
+            await self.coordinator.send_command(CMD_FAN_STATE, 1, 0)
+            await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 
     async def async_set_percentage(self, percentage: int) -> None:
         if percentage == 0:
             await self.async_turn_off()
         else:
-            await self.coordinator.send_command(CMD_FAN_STATE, 1, 1)
-            await self.coordinator.send_command(CMD_FAN_SPEED, 1, percentage)
+            if not self.coordinator.data.get("fan_state"):
+                await self.coordinator.send_command(CMD_FAN_STATE, 1, 1)
+            if percentage != self.coordinator.data.get("fan_speed"):
+                await self.coordinator.send_command(CMD_FAN_SPEED, 1, percentage)
+
+            await self.coordinator.send_command(CMD_HOOD_STATUS, 0)

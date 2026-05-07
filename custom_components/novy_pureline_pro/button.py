@@ -11,10 +11,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CMD_HOOD_STATUS,
     CMD_FAN_DEFAULT,
-    CMD_FAN_RECIRCULATE,
     CMD_FAN_SPEED,
-    CMD_FAN_STATE,
     CMD_LIGHT_DEFAULT,
     CMD_LIGHT_ON_AMBI,
     CMD_LIGHT_ON_WHITE,
@@ -109,6 +108,8 @@ class DelayedOffButton(_BaseButton):
         if data.get("fan_state"):
             duration = 30 * 60 if data.get("recirculate") else 5 * 60
             self.coordinator.start_auto_off(duration)
+         
+        await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 
 
 class SetDefaultLightButton(_BaseButton):
@@ -124,6 +125,7 @@ class SetDefaultLightButton(_BaseButton):
         mode = self.coordinator.data.get("light_mode", 1)
         # C++ sends {1, lightmode}: [42;1;mode]
         await self.coordinator.send_command(CMD_LIGHT_DEFAULT, 1, mode)
+        await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 
 
 class SetDefaultSpeedButton(_BaseButton):
@@ -138,6 +140,7 @@ class SetDefaultSpeedButton(_BaseButton):
     async def async_press(self) -> None:
         # C++ sends {0}: [41;0]
         await self.coordinator.send_command(CMD_FAN_DEFAULT, 0)
+        await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 
 
 class AmbiLightButton(_BaseButton):
@@ -152,6 +155,7 @@ class AmbiLightButton(_BaseButton):
     async def async_press(self) -> None:
         # C++ sends {0}: [15;0]
         await self.coordinator.send_command(CMD_LIGHT_ON_AMBI, 0)
+        await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 
 
 class WhiteLightButton(_BaseButton):
@@ -166,6 +170,7 @@ class WhiteLightButton(_BaseButton):
     async def async_press(self) -> None:
         # C++ sends {0}: [16;0]
         await self.coordinator.send_command(CMD_LIGHT_ON_WHITE, 0)
+        await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 
 
 class ResetGreaseButton(_BaseButton):
