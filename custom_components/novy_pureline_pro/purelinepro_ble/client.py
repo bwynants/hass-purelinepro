@@ -31,6 +31,10 @@ StateCallback = Callable[[dict[str, Any]], None]
 # coordinator so that every connect() attempt uses the best available backend.
 BLEDeviceFactory = Callable[[], Any]  # Returns bleak.backends.device.BLEDevice | None
 
+_STATUS_CYCLE_SLEEP = 3  # full 400/02/403/404 once every 30 seconds 400 every 3s
+_STATUS_CYCLE_INTERVAL = 10 # poll 400/402/403/404 once every 30 seconds
+
+_STATUS_CYCLE_EXTRA_CMDS = [CMD_HOOD_STATUS, CMD_HOOD_STATUS_402, CMD_HOOD_STATUS_403, CMD_HOOD_STATUS_404]
 
 class PurelineProClient:
     """Async BLE protocol client for the Novy Pureline Pro extractor hood.
@@ -66,6 +70,11 @@ class PurelineProClient:
         self._client: Any = None  # BleakClient at runtime
         self._poll_task: asyncio.Task[None] | None = None
         self._reconnect_task: asyncio.Task[None] | None = None
+        
+        self._last_connect_attempt: float = 0.0
+        self._connect_cooldown = 8.0   # seconds
+
+        self.fast_count : int = 0
 
         # Guards against concurrent connect() calls (e.g. reconnect loop +
         # coordinator BT-advertisement callback racing each other).
@@ -76,17 +85,16 @@ class PurelineProClient:
         # happen to be 20 bytes).
         self._pending_status_cmd: int | None = None
 
+        # we should not start sending commands until the notification subscription is active, otherwise the device drops them on the floor and we get out of sync with pending_count
+        self._notification_active : bool = False
+
         # Counts entity commands or status request sent but not yet ACK-ed by the device.
         # so we never overlap commands with cmds or status polls.
-        self._pending_count: int = 0
+        self._response_future: asyncio.Future | None = None
 
         # Serialises all GATT writes — prevents concurrent TX from poll loop
         # and command handlers racing each other and overwhelming the BLE proxy.
-        self._write_lock: asyncio.Lock = asyncio.Lock()
-
-        # Set by _on_bleak_disconnected so the poll loop re-runs the
-        # 402/403/404 STATUS_CYCLE immediately after reconnect.
-        self._full_cycle_needed: bool = False
+        self._send_command_lock: asyncio.Lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
     # Public API
@@ -98,6 +106,7 @@ class PurelineProClient:
         return self._client is not None and self._client.is_connected
 
     async def connect(self) -> None:
+        _LOGGER.info("connect() Pureline Pro")
         """Open the BLE connection and subscribe to NUS notifications.
 
         Guards against concurrent calls: if a connect attempt is already in
@@ -110,8 +119,8 @@ class PurelineProClient:
         if self._connecting:
             # Another coroutine is mid-connect — wait for it to settle.
             _LOGGER.debug("connect() waiting for in-progress connect to settle")
-            while self._connecting:
-                await asyncio.sleep(0.1)
+            while self._connecting and not self.is_connected:
+                await asyncio.sleep(0.2)
             # If that attempt succeeded we're done; otherwise fall through and
             # try again ourselves.
             if self.is_connected:
@@ -168,6 +177,8 @@ class PurelineProClient:
 
         await self._client.start_notify(UART_TX_CHAR_UUID, self._on_notification)
         _LOGGER.info("Connected to Pureline Pro %s", self._address)
+        self._notification_active = True
+        self.fast_count = 0
 
     async def disconnect(self) -> None:
         """Stop the polling loop and close the BLE connection."""
@@ -195,52 +206,62 @@ class PurelineProClient:
         """
         if not self.is_connected:
             raise RuntimeError("Not connected — call connect() first")
+
+        while not self._notification_active:    
+            _LOGGER.debug("send_command waiting for notification subscription to become active")
+            await asyncio.sleep(0.2)
+
         if args:
             frame = f"[{cmd_id};{';'.join(str(a) for a in args)}]"
         else:
             frame = f"[{cmd_id}]"
 
-        # Wait for any previous commands before sending a new one 
-        ack_deadline = asyncio.get_event_loop().time() + REQUEST_TIMEOUT_S
-        while self._pending_count > 0:
-            _LOGGER.debug("waiting for pending responses before TX %s", frame)
-            if asyncio.get_event_loop().time() > ack_deadline:
-                _LOGGER.error(
-                    "Timed out waiting for %d pending response before TX %s — proceeding",
-                    self._pending_count,
-                    frame,
-                )
-                self._pending_count = 0
-                break
-            await asyncio.sleep(0.1)
+        async with self._send_command_lock:  # This enforces "at most 1 command"
+            if self._response_future and not self._response_future.done():
+                # This should never happen because of the lock, but safety first
+                self._response_future.cancel()
 
-        async with self._write_lock:
             _LOGGER.debug("TX: %s", frame)
             if cmd_id in HOOD_STATUS_CMDS:
                 self._pending_status_cmd = cmd_id
-            # Track entity commands (not status polls) so request_status can
-            # wait for ACKs before issuing a new 40x request.
-            self._pending_count += 1
+
+            # Create a new future for this command
+            loop = asyncio.get_running_loop()
+            self._response_future = loop.create_future()
+
             try:
                 await self._client.write_gatt_char(UART_RX_CHAR_UUID, frame.encode(), response=False)
-            # 300 ms gap between writes — the BLE proxy and device drop the
-            # connection when writes arrive too quickly (observed at RSSI ≈ -80 dBm).
-            #await asyncio.sleep(0.3)
+
+                # 200 ms gap between writes — the BLE proxy and device drop the
+                # connection when writes arrive too quickly (observed at RSSI ≈ -80 dBm).
+                await asyncio.sleep(0.2)
+
+                # Wait for notification or timeout
+                await asyncio.wait_for(self._response_future, REQUEST_TIMEOUT_S)
+
+            except asyncio.TimeoutError:
+                _LOGGER.debug("TX failed due to timeout for: %s", frame)
+                # Clean up on timeout
+                if self._response_future and not self._response_future.done():
+                    self._response_future.cancel()
+                raise TimeoutError(f"Command '{REQUEST_TIMEOUT_S}' timed out after {REQUEST_TIMEOUT_S}s")
             except Exception:
                 _LOGGER.debug("TX failed for: %s", frame)
-                self._pending_count -= 1
+                if self._response_future and not self._response_future.done():
+                    self._response_future.cancel()
+                raise
+            finally:
                 if cmd_id in HOOD_STATUS_CMDS:
                     self._pending_status_cmd = None
-                raise
-        if cmd_id is CMD_FAN_RECIRCULATE:
-            # force an immediate state refresh after recirculate toggle
-            await self.send_command(CMD_HOOD_STATUS_402, 0)
+                self._response_future = None  # Clean up
+
 
     async def start_polling(self) -> None:
         """Start the background polling loop (connects if not already connected)."""
         if self._poll_task and not self._poll_task.done():
             return
         self._poll_task = asyncio.ensure_future(self._poll_loop())
+
 
     async def stop_polling(self) -> None:
         """Cancel the background polling loop and suppress further auto-reconnects."""
@@ -268,15 +289,15 @@ class PurelineProClient:
         if self._client is None:
             # Already handled (callback sometimes fires multiple times via proxy)
             return
-        _LOGGER.warning("Pureline Pro %s unexpectedly disconnected", self._address)
+        _LOGGER.debug("Pureline Pro %s  disconnected", self._address)
         self._client = None
         # Clear all pending-response flags so any waiting send_command()
         # calls exit their loop immediately instead of waiting out the deadline.
         self._pending_status_cmd = None
-        self._pending_count = 0
+        self._notification_active = False
+
         # Request a full 402/403/404 cycle after the next reconnect so state
         # is refreshed as soon as the connection is restored.
-        self._full_cycle_needed = True
         if self._on_disconnect_cb:
             self._on_disconnect_cb()
         # Ensure only one reconnect task is running at a time
@@ -284,24 +305,47 @@ class PurelineProClient:
             self._reconnect_task = asyncio.ensure_future(self._reconnect())
 
     async def _reconnect(self) -> None:
-        await asyncio.sleep(RECONNECT_DELAY_S)
-        try:
-            await self.connect()
-        except Exception as err:
-            _LOGGER.error("Reconnect failed: %s — retrying", err)
-            self._reconnect_task = asyncio.ensure_future(self._reconnect())
+        attempt = 0
+        while True:
+            await asyncio.sleep(RECONNECT_DELAY_S * (1.5 ** attempt))  # 8s → 12s → 18s...
+            attempt = min(attempt + 1, 6)  # cap backoff
 
-    # ------------------------------------------------------------------
+            if self.is_connected:
+                return
+
+            try:
+                await self.connect()
+                _LOGGER.info("Reconnected successfully")
+                return
+            except Exception as err:
+                _LOGGER.error("Reconnect attempt failed: %s", err)
+
+    # ----------------------------------------x--------------------------
     # Internal — notification / packet parsing
     # ------------------------------------------------------------------
 
     def _on_notification(self, _handle: int, data: bytes) -> None:
-        asyncio.ensure_future(self._handle_notification(data))
+        if self._response_future and not self._response_future.done():
+            # You might want to decode/parse the data here
+            try:
+                response = self._handle_notification(data)
+                self._response_future.set_result(response)
+            except Exception as e:
+                _LOGGER.debug("_on_notification exception")
+                self._response_future.set_exception(e)
+        else:
+            # Unexpected notification (or previous one timed out
+            print(f"Unexpected notification: {data}")
 
-    async def _handle_notification(self, data: bytes) -> None:
+    def can_attempt_connect(self) -> bool:
+        """Return whether we're allowed to attempt a connection now."""
+        if self._connecting:
+            return False
+        now = asyncio.get_event_loop().time()
+        return now - self._last_connect_attempt >= self._connect_cooldown
+
+    def _handle_notification(self, data: bytes) -> None:
         """Route an incoming BLE payload to the correct packet parser."""
-
-        self._pending_count = max(0, self._pending_count - 1)
 
         # ACK strings arrive as ASCII, e.g. ``[1;1;1]`` (one value per command).
         if data.startswith(b"[") and data.endswith(b"]"):
@@ -316,25 +360,21 @@ class PurelineProClient:
 
         if self._pending_status_cmd == CMD_HOOD_STATUS:
             state = self._parse_400(data)
-            self._pending_status_cmd = None
             if state is None:
                 _LOGGER.debug("Packet400 parse failed for %d-byte payload: %s", size, data.hex())
 
         elif self._pending_status_cmd == CMD_HOOD_STATUS_402:
             state = self._parse_402(data)
-            self._pending_status_cmd = None
             if state is None:
                 _LOGGER.debug("Packet402 parse failed for %d-byte payload: %s", size, data.hex())
 
         elif self._pending_status_cmd == CMD_HOOD_STATUS_403:
             state = self._parse_403(data)
-            self._pending_status_cmd = None
             if state is None:
                 _LOGGER.debug("Packet403 parse failed for %d-byte payload: %s", size, data.hex())
 
         elif self._pending_status_cmd == CMD_HOOD_STATUS_404:
             state = self._parse_404(data)
-            self._pending_status_cmd = None
             if state is None:
                 _LOGGER.debug("Packet404 parse failed for %d-byte payload: %s", size, data.hex())
 
@@ -362,6 +402,7 @@ class PurelineProClient:
             "light_mode": pkt.lightmode,
             "brightness": pkt.brightness,
             "brightness_pct": pkt.brightness_pct,
+            "colortemp": pkt.colortemp,
             "color_temp_mireds": pkt.color_temp_mireds,
             "boost": pkt.boost,
             "stopping": pkt.stopping,
@@ -409,13 +450,10 @@ class PurelineProClient:
     # Internal — polling loop
     # ------------------------------------------------------------------
 
-    STATUS_CYCLE_INTERVAL = 30  # poll 402/403/404 once every 30 seconds
-    _STATUS_CYCLE = [CMD_HOOD_STATUS_402, CMD_HOOD_STATUS_403, CMD_HOOD_STATUS_404]
 
-    async def _run_status_cycle(self) -> None:
+    async def _run_extra_status_cycle(self) -> None:
         """Poll 402 / 403 / 404 in sequence (used at startup and after reconnect)."""
-        _LOGGER.debug("STATUS_CYCLE starting (connected=%s)", self.is_connected)
-        for cmd in self._STATUS_CYCLE:
+        for cmd in _STATUS_CYCLE_EXTRA_CMDS:
             if not self.is_connected:
                 _LOGGER.debug("STATUS_CYCLE aborted — not connected at cmd %d", cmd)
                 return
@@ -423,8 +461,7 @@ class PurelineProClient:
                 await self.send_command(cmd, 0)
             except Exception as err:
                 _LOGGER.debug("STATUS_CYCLE cmd %d error: %s", cmd, err)
-            await asyncio.sleep(0.5)
-        _LOGGER.debug("STATUS_CYCLE complete")
+            await asyncio.sleep(0.2)
 
     async def _poll_loop(self) -> None:
         _LOGGER.debug("Poll loop starting")
@@ -445,17 +482,9 @@ class PurelineProClient:
                 await asyncio.sleep(RECONNECT_DELAY_S)
 
         _LOGGER.debug("Poll loop connected — running initial STATUS_CYCLE")
-        await self._run_status_cycle()
 
-        fast_count = 0
-        cycle_index = 0
+        self.fast_count = 0
         while True:
-            # After a reconnect, re-run the full 402/403/404 cycle immediately.
-            if self._full_cycle_needed and self.is_connected:
-                self._full_cycle_needed = False
-                await self._run_status_cycle()
-                fast_count = 0
-
             if not self.is_connected:
                 # Disconnected — reconnect is handled by _on_bleak_disconnected /
                 # _reconnect() / _on_bt_advertisement.  Just wait here.
@@ -463,17 +492,17 @@ class PurelineProClient:
                 continue
 
             try:
-                if fast_count >= self.STATUS_CYCLE_INTERVAL:
-                    fast_count = 0
-                    cmd = self._STATUS_CYCLE[cycle_index % len(self._STATUS_CYCLE)]
-                    cycle_index += 1
-                    await self.send_command(cmd, 0)
+                if self.fast_count == 0:
+                    await self._run_extra_status_cycle()
                 else:
-                    if fast_count % 1 == 0:
-                        await self.send_command(CMD_HOOD_STATUS, 0)
-                    fast_count += 1
+                    await self.send_command(CMD_HOOD_STATUS, 0)
+                
+                self.fast_count += 1
+                if self.fast_count >= _STATUS_CYCLE_INTERVAL:
+                    self.fast_count = 0
+
             except asyncio.CancelledError:
                 raise
             except Exception as err:
                 _LOGGER.warning("Poll error: %s", err)
-            await asyncio.sleep(1)
+            await asyncio.sleep(_STATUS_CYCLE_SLEEP)

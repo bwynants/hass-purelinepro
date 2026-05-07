@@ -16,6 +16,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CMD_HOOD_STATUS,
     CMD_LIGHT_BRIGHTNESS,
     CMD_LIGHT_COLORTEMP,
     CMD_LIGHT_OFF,
@@ -30,7 +31,6 @@ if TYPE_CHECKING:
     from .coordinator import PurelineProConfigEntry, PurelineProCoordinator
 
 from .purelinepro_ble import mireds_to_raw_colortemp, pct_to_raw_brightness
-
 
 def _kelvin_to_mireds(kelvin: int) -> int:
     return round(1_000_000 / kelvin)
@@ -84,7 +84,7 @@ class ExtractorLightEntity(CoordinatorEntity["PurelineProCoordinator"], LightEnt
 
     @property
     def brightness(self) -> int | None:
-        ha = self.coordinator.data.get("brightness_ha")
+        ha = self.coordinator.data.get("brightness_pct")
         if ha is None:
             return None
         return round(ha * 255)
@@ -110,22 +110,29 @@ class ExtractorLightEntity(CoordinatorEntity["PurelineProCoordinator"], LightEnt
 
         raw_colortemp = mireds_to_raw_colortemp(mireds)
 
-        # Choose ambi vs white based on color temperature
-        # C++ sends {0} as single arg for mode-switch commands: [15;0] / [16;0]
-        if raw_colortemp > 127:
-            await self.coordinator.send_command(CMD_LIGHT_ON_AMBI, 0)
-        else:
-            await self.coordinator.send_command(CMD_LIGHT_ON_WHITE, 0)
+        if not self.coordinator.data.get("light_state"):
+            # Choose ambi vs white based on color temperature
+            # C++ sends {0} as single arg for mode-switch commands: [15;0] / [16;0]
+            if raw_colortemp > 127:
+                await self.coordinator.send_command(CMD_LIGHT_ON_AMBI, 0)
+            else:
+                await self.coordinator.send_command(CMD_LIGHT_ON_WHITE, 0)
 
         if brightness_ha is not None:
             raw_brightness = pct_to_raw_brightness(brightness_ha)
-            # C++ sends {1, value}: [21;1;brightness]
-            await self.coordinator.send_command(CMD_LIGHT_BRIGHTNESS, 1, raw_brightness)
+            if raw_brightness != self.coordinator.data.get("brightness"):
+                # C++ sends {1, value}: [21;1;brightness]
+                await self.coordinator.send_command(CMD_LIGHT_BRIGHTNESS, 1, raw_brightness)
 
         # C++ sends {1, value}: [22;1;colortemp]
-        await self.coordinator.send_command(CMD_LIGHT_COLORTEMP, 1, raw_colortemp)
+        if raw_colortemp != self.coordinator.data.get("colortemp"):
+            await self.coordinator.send_command(CMD_LIGHT_COLORTEMP, 1, raw_colortemp)
+
+        await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         # C++ sends {0}: [36;0]
-        await self.coordinator.send_command(CMD_LIGHT_OFF, 0)
+        if self.coordinator.data.get("light_state"):
+            await self.coordinator.send_command(CMD_LIGHT_OFF, 0)
+            await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 

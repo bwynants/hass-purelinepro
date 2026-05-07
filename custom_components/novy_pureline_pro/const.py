@@ -5,6 +5,8 @@ Protocol constants (UUIDs, command IDs, packet sizes) live in the
 """
 
 from .purelinepro_ble.const import (  # noqa: F401
+    CMD_HOOD_STATUS,
+    CMD_HOOD_STATUS_402,
     CMD_FAN_DEFAULT,
     CMD_FAN_RECIRCULATE,
     CMD_FAN_SPEED,
