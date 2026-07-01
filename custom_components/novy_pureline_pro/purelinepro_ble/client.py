@@ -13,7 +13,6 @@ from .const import (
     CMD_HOOD_STATUS_402,
     CMD_HOOD_STATUS_403,
     CMD_HOOD_STATUS_404,
-    CMD_FAN_RECIRCULATE,
     HOOD_STATUS_CMDS,
     RECONNECT_DELAY_S,
     REQUEST_TIMEOUT_S,
@@ -136,6 +135,7 @@ class PurelineProClient:
 
     async def _do_connect(self) -> None:
         """Internal: perform the actual BLE connection."""
+        self._last_connect_attempt = asyncio.get_event_loop().time()
         from bleak import BleakClient  # lazy — avoids blocking import at module load
 
         ble_device = self._ble_device_factory() if self._ble_device_factory else None
@@ -207,7 +207,9 @@ class PurelineProClient:
         if not self.is_connected:
             raise RuntimeError("Not connected — call connect() first")
 
-        while not self._notification_active:    
+        while not self._notification_active:
+            if not self.is_connected:
+                raise RuntimeError("Disconnected while waiting for notification subscription")
             _LOGGER.debug("send_command waiting for notification subscription to become active")
             await asyncio.sleep(0.2)
 
@@ -244,7 +246,7 @@ class PurelineProClient:
                 # Clean up on timeout
                 if self._response_future and not self._response_future.done():
                     self._response_future.cancel()
-                raise TimeoutError(f"Command '{REQUEST_TIMEOUT_S}' timed out after {REQUEST_TIMEOUT_S}s")
+                raise TimeoutError(f"Command '{frame}' timed out after {REQUEST_TIMEOUT_S}s")
             except Exception:
                 _LOGGER.debug("TX failed for: %s", frame)
                 if self._response_future and not self._response_future.done():
@@ -334,8 +336,8 @@ class PurelineProClient:
                 _LOGGER.debug("_on_notification exception")
                 self._response_future.set_exception(e)
         else:
-            # Unexpected notification (or previous one timed out
-            print(f"Unexpected notification: {data}")
+            # Unexpected notification (or previous one timed out)
+            _LOGGER.debug("Unexpected notification: %s", data.hex())
 
     def can_attempt_connect(self) -> bool:
         """Return whether we're allowed to attempt a connection now."""

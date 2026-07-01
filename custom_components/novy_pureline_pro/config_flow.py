@@ -44,6 +44,7 @@ def _is_pureline_device(info: BluetoothServiceInfoBleak) -> bool:
     return name.startswith("pureline")
 
 
+def _device_label(info: BluetoothServiceInfoBleak) -> str:
     """Human-readable label for a discovered BLE device."""
     name = info.name or "Pureline Pro"
     return f"{name} ({info.address})"

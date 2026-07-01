@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "purelinepro-ble"
@@ -11,4 +11,4 @@ requires-python = ">=3.11"
 dependencies = ["bleak>=0.21"]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/purelinepro-ha"
+Homepage = "https://github.com/bwynants/hass-purelinepro"
