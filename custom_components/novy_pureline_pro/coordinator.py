@@ -19,7 +19,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import CMD_FAN_STATE, CONF_ADDRESS, DOMAIN
+from .const import CMD_HOOD_STATUS, CMD_FAN_STATE, CONF_ADDRESS, DOMAIN
 
 if TYPE_CHECKING:
     from .purelinepro_ble import PurelineProClient
@@ -73,12 +73,36 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_setup(self) -> None:
         """One-time setup called automatically on the first coordinator refresh."""
+        _LOGGER.info("Starting setup for Pureline Pro %s - waiting for Bluetooth advertisement", self._address)
+        
+        # Give Bluetooth stack and proxies time to initialize after HA restart
+        await asyncio.sleep(8)   # Initial grace period (adjust between 5-15s if needed)
+
         # Seed from HA's BT cache — try connectable first, then any advertisement.
         self._ble_device = async_ble_device_from_address(
             self.hass, self._address, connectable=True
         ) or async_ble_device_from_address(
             self.hass, self._address, connectable=False
         )
+
+        if not self._ble_device:
+            _LOGGER.info("Hood not yet visible. Waiting up to 1 min for first advertisement...")
+            for attempt in range(20):   # max 1 min
+                await asyncio.sleep(3)
+                self._ble_device = async_ble_device_from_address(
+                    self.hass, self._address, connectable=True
+                ) or async_ble_device_from_address(
+                    self.hass, self._address, connectable=False
+                )
+                if self._ble_device:
+                    _LOGGER.info("Hood advertisement detected after %d seconds", (attempt + 1) * 3)
+                    break
+            else:
+                _LOGGER.warning(
+                    "Still no advertisement from %s after waiting. "
+                    "Check if the hood is powered on and proxy is close enough.",
+                    self._address
+                )
 
         if self._ble_device:
             _LOGGER.info(
@@ -116,7 +140,7 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             BluetoothScanningMode.ACTIVE,
         )
         self.config_entry.async_on_unload(cancel)
-
+        
         # Start the polling loop (connects as soon as BLEDevice becomes available)
         await self._client.start_polling()
 
@@ -149,7 +173,7 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._client.is_connected,
         )
         # Only attempt to connect when we have a connectable device
-        if not self._client.is_connected and not self._client._connecting and service_info.connectable:
+        if not self._client.is_connected and not self._client._connecting and service_info.connectable and self._client.can_attempt_connect():
             self.hass.async_create_task(
                 self._client.connect(),
                 name=f"purelinepro_connect_{self._address}",
@@ -242,12 +266,13 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.data["auto_off_seconds"] = 0
             self.async_set_updated_data(self.data)
             await self.send_command(CMD_FAN_STATE, 1, 0)
+            await self.send_command(CMD_HOOD_STATUS, 0)
         except asyncio.CancelledError:
             self.data["auto_off_seconds"] = 0
             self.async_set_updated_data(self.data)
             raise
 
     def _on_disconnect(self) -> None:
-        _LOGGER.warning("Pureline Pro %s disconnected", self._address)
+        _LOGGER.debug("Pureline Pro %s disconnected", self._address)
         # PurelineProClient handles automatic reconnect; _on_bt_advertisement
         # will re-seed _ble_device when the hood starts advertising again.
