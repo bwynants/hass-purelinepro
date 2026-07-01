@@ -73,36 +73,17 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_setup(self) -> None:
         """One-time setup called automatically on the first coordinator refresh."""
-        _LOGGER.info("Starting setup for Pureline Pro %s - waiting for Bluetooth advertisement", self._address)
+        _LOGGER.info("Setting up Pureline Pro %s", self._address)
         
-        # Give Bluetooth stack and proxies time to initialize after HA restart
-        await asyncio.sleep(8)   # Initial grace period (adjust between 5-15s if needed)
-
         # Seed from HA's BT cache — try connectable first, then any advertisement.
+        # Do NOT block here waiting for an advertisement: config-entry setup must
+        # return promptly.  Connecting (with retries) happens in the background
+        # via the poll loop and the advertisement callback registered below.
         self._ble_device = async_ble_device_from_address(
             self.hass, self._address, connectable=True
         ) or async_ble_device_from_address(
             self.hass, self._address, connectable=False
         )
-
-        if not self._ble_device:
-            _LOGGER.info("Hood not yet visible. Waiting up to 1 min for first advertisement...")
-            for attempt in range(20):   # max 1 min
-                await asyncio.sleep(3)
-                self._ble_device = async_ble_device_from_address(
-                    self.hass, self._address, connectable=True
-                ) or async_ble_device_from_address(
-                    self.hass, self._address, connectable=False
-                )
-                if self._ble_device:
-                    _LOGGER.info("Hood advertisement detected after %d seconds", (attempt + 1) * 3)
-                    break
-            else:
-                _LOGGER.warning(
-                    "Still no advertisement from %s after waiting. "
-                    "Check if the hood is powered on and proxy is close enough.",
-                    self._address
-                )
 
         if self._ble_device:
             _LOGGER.info(
@@ -173,7 +154,7 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._client.is_connected,
         )
         # Only attempt to connect when we have a connectable device
-        if not self._client.is_connected and not self._client._connecting and service_info.connectable and self._client.can_attempt_connect():
+        if not self._client.is_connected and service_info.connectable and self._client.can_attempt_connect():
             self.hass.async_create_task(
                 self._client.connect(),
                 name=f"purelinepro_connect_{self._address}",
@@ -203,8 +184,11 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return True when the BLE link is established."""
         return self._client.is_connected
 
-    async def disconnect(self) -> bool:
-        """disconnect BLE"""
+    async def disconnect(self) -> None:
+        """Disconnect BLE and cancel any pending software auto-off countdown."""
+        if self._auto_off_task and not self._auto_off_task.done():
+            self._auto_off_task.cancel()
+            self._auto_off_task = None
         await self._client.disconnect()
 
     async def send_command(self, cmd_id: int, *args: int) -> None:

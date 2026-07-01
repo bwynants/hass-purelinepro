@@ -1,10 +1,10 @@
 {
   "domain": "novy_pureline_pro",
   "name": "Novy Pureline Pro",
-  "version": "1.0.0",
-  "documentation": "https://github.com/yourusername/purelinepro-ha",
-  "issue_tracker": "https://github.com/yourusername/purelinepro-ha/issues",
-  "codeowners": ["@yourusername"],
+  "version": "1.1.0",
+  "documentation": "https://github.com/bwynants/hass-purelinepro",
+  "issue_tracker": "https://github.com/bwynants/hass-purelinepro/issues",
+  "codeowners": ["@bwynants"],
   "iot_class": "local_push",
   "bluetooth": [
     {
