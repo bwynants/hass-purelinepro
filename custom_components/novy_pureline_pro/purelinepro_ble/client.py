@@ -30,8 +30,10 @@ StateCallback = Callable[[dict[str, Any]], None]
 # coordinator so that every connect() attempt uses the best available backend.
 BLEDeviceFactory = Callable[[], Any]  # Returns bleak.backends.device.BLEDevice | None
 
-_STATUS_CYCLE_SLEEP = 3  # full 400/02/403/404 once every 30 seconds 400 every 3s
-_STATUS_CYCLE_INTERVAL = 10 # poll 400/402/403/404 once every 30 seconds
+# Seconds between polls: request the main status packet (400) every 3s.
+_STATUS_CYCLE_SLEEP = 3
+# Every Nth poll (~30s) also refresh the slow-changing extended status (402/403/404).
+_STATUS_CYCLE_INTERVAL = 10
 
 _STATUS_CYCLE_EXTRA_CMDS = [CMD_HOOD_STATUS, CMD_HOOD_STATUS_402, CMD_HOOD_STATUS_403, CMD_HOOD_STATUS_404]
 

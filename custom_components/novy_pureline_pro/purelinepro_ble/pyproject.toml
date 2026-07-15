@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "purelinepro-ble"
-version = "1.0.0"
+version = "1.1.0"
 description = "BLE protocol library for the Novy Pureline Pro extractor hood"
 license = { text = "MIT" }
 requires-python = ">=3.11"

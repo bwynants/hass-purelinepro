@@ -10,11 +10,10 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .entity import build_device_info
 
 if TYPE_CHECKING:
     from .coordinator import PurelineProConfigEntry, PurelineProCoordinator
@@ -42,12 +41,7 @@ class _BasePurelineBinarySensor(
         self, coordinator: "PurelineProCoordinator", entry: "PurelineProConfigEntry"
     ) -> None:
         super().__init__(coordinator)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Novy Pureline Pro",
-            manufacturer="Novy",
-            model="Pureline Pro",
-        )
+        self._attr_device_info = build_device_info(entry.entry_id)
 
     @callback
     def _handle_coordinator_update(self) -> None:

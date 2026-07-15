@@ -89,7 +89,7 @@ class Packet400:
     stopping: bool = field(default=False, init=False)
     timer_seconds: int = field(default=0, init=False)
     grease_dirty: bool = field(default=False, init=False)
-    brightness_pct: float = field(default=False, init=False)
+    brightness_pct: float = field(default=0.0, init=False)
     color_temp_mireds: int = field(default=COLOR_TEMP_MIREDS_COOL, init=False)
 
     def __post_init__(self) -> None:

@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -19,8 +18,8 @@ from .const import (
     CMD_LIGHT_ON_WHITE,
     CMD_POWER,
     CMD_RESET_GREASE,
-    DOMAIN,
 )
+from .entity import build_device_info
 
 if TYPE_CHECKING:
     from .coordinator import PurelineProConfigEntry, PurelineProCoordinator
@@ -56,12 +55,7 @@ class _BaseButton(CoordinatorEntity["PurelineProCoordinator"], ButtonEntity):
     ) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}_{unique_suffix}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Novy Pureline Pro",
-            manufacturer="Novy",
-            model="Pureline Pro",
-        )
+        self._attr_device_info = build_device_info(entry.entry_id)
 
     @property
     def available(self) -> bool:

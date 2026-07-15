@@ -11,7 +11,6 @@ from homeassistant.components.light import (
     LightEntity,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -24,8 +23,8 @@ from .const import (
     CMD_LIGHT_ON_WHITE,
     COLOR_TEMP_MAX_KELVIN,
     COLOR_TEMP_MIN_KELVIN,
-    DOMAIN,
 )
+from .entity import build_device_info
 
 if TYPE_CHECKING:
     from .coordinator import PurelineProConfigEntry, PurelineProCoordinator
@@ -63,12 +62,7 @@ class ExtractorLightEntity(CoordinatorEntity["PurelineProCoordinator"], LightEnt
     ) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}_light"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Novy Pureline Pro",
-            manufacturer="Novy",
-            model="Pureline Pro",
-        )
+        self._attr_device_info = build_device_info(entry.entry_id)
 
     @callback
     def _handle_coordinator_update(self) -> None:
