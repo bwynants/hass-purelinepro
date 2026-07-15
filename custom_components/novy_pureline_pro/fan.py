@@ -6,11 +6,11 @@ from typing import Any, TYPE_CHECKING
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CMD_HOOD_STATUS, CMD_FAN_SPEED, CMD_FAN_STATE, DOMAIN
+from .const import CMD_HOOD_STATUS, CMD_FAN_SPEED, CMD_FAN_STATE
+from .entity import build_device_info
 
 if TYPE_CHECKING:
     from .coordinator import PurelineProConfigEntry, PurelineProCoordinator
@@ -41,12 +41,7 @@ class ExtractorFanEntity(CoordinatorEntity["PurelineProCoordinator"], FanEntity)
     ) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}_fan"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Novy Pureline Pro",
-            manufacturer="Novy",
-            model="Pureline Pro",
-        )
+        self._attr_device_info = build_device_info(entry.entry_id)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -66,7 +61,11 @@ class ExtractorFanEntity(CoordinatorEntity["PurelineProCoordinator"], FanEntity)
         return int(speed) if speed is not None else None
 
     async def async_turn_on(self,  percentage: int | None = None,  preset_mode: str | None = None,  **kwargs: Any) -> None:
-        speed = percentage or self.coordinator.data.get("fan_speed") or 50
+        # An explicit 0% is an "off" request, not "use the default speed".
+        if percentage == 0:
+            await self.async_turn_off()
+            return
+        speed = percentage if percentage is not None else (self.coordinator.data.get("fan_speed") or 50)
         # C++ sends {1, state} and {1, speed}: [29;1;1] and [28;1;speed]
         if not self.coordinator.data.get("fan_state"):
             await self.coordinator.send_command(CMD_FAN_STATE, 1, 1)
