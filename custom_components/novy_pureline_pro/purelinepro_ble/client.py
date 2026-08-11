@@ -335,8 +335,13 @@ class PurelineProClient:
                 response = self._handle_notification(data)
                 self._response_future.set_result(response)
             except Exception as e:
-                _LOGGER.debug("_on_notification exception")
-                self._response_future.set_exception(e)
+                _LOGGER.debug("_on_notification exception: %s", e)
+                # The future may have been resolved or cancelled in the
+                # meantime (or set_result() itself raised InvalidStateError);
+                # never set_exception() on an already-done future — that would
+                # raise inside the BLE notification handler.
+                if not self._response_future.done():
+                    self._response_future.set_exception(e)
         else:
             # Unexpected notification (or previous one timed out)
             _LOGGER.debug("Unexpected notification: %s", data.hex())
