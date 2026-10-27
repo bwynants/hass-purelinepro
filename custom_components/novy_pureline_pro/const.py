@@ -39,5 +39,12 @@ COLOR_TEMP_MAX_MIREDS = COLOR_TEMP_MIREDS_WARM
 # Config entry keys
 CONF_ADDRESS = "address"
 
+# Options (config entry options flow)
+# "Delayed Off" button: also switch the light to the ambi preset, the way the
+# hood's own C++ firmware does. Off by default so that Home Assistant (e.g. a
+# Layers layer) stays the only party driving the light.
+CONF_AMBI_ON_DELAYED_OFF = "ambi_on_delayed_off"
+DEFAULT_AMBI_ON_DELAYED_OFF = False
+
 # Platforms provided by this integration
 PLATFORMS = ["fan", "light", "button", "switch", "sensor", "binary_sensor"]

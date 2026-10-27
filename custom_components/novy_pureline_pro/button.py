@@ -18,6 +18,8 @@ from .const import (
     CMD_LIGHT_ON_WHITE,
     CMD_POWER,
     CMD_RESET_GREASE,
+    CONF_AMBI_ON_DELAYED_OFF,
+    DEFAULT_AMBI_ON_DELAYED_OFF,
 )
 from .entity import build_device_info
 
@@ -77,19 +79,31 @@ class PowerToggleButton(_BaseButton):
 
 
 class DelayedOffButton(_BaseButton):
-    """Reduce fan to switch-off speed and start auto-off timer."""
+    """Reduce fan to switch-off speed and start auto-off timer.
+
+    Switching the light to the ambi preset (what the C++ firmware does) is
+    optional: see the "ambi_on_delayed_off" option. It is off by default
+    because the hood then changes the light behind Home Assistant's back,
+    which e.g. makes Layers drop its layer and take the dimmed light as the
+    new base; the light would never go off afterwards.
+    """
 
     _attr_translation_key = "delayed_off"
     _attr_icon = "mdi:timer-off"
 
     def __init__(self, coordinator: PurelineProCoordinator, entry: PurelineProConfigEntry) -> None:
         super().__init__(coordinator, entry, "btn_delayed_off")
+        self._entry = entry
 
     async def async_press(self) -> None:
         data = self.coordinator.data
 
-        # Switch light to ambi if it is currently on (mirrors C++ behaviour).
-        if data.get("light_mode", 0) > 0:
+        # Optionally switch the light to ambi if it is currently on (mirrors
+        # C++ behaviour). Read at press time so saving the option is enough.
+        ambi_on_delayed_off = self._entry.options.get(
+            CONF_AMBI_ON_DELAYED_OFF, DEFAULT_AMBI_ON_DELAYED_OFF
+        )
+        if ambi_on_delayed_off and data.get("light_mode", 0) > 0:
             await self.coordinator.send_command(CMD_LIGHT_ON_AMBI, 0)
 
         # Reduce fan speed to the stored switch-off speed (only if faster).

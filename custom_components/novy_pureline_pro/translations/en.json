@@ -29,6 +29,19 @@
       "not_supported": "This device is not a supported Novy Pureline Pro."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Novy Pureline Pro options",
+        "data": {
+          "ambi_on_delayed_off": "Switch light to ambi on Delayed Off"
+        },
+        "data_description": {
+          "ambi_on_delayed_off": "When the Delayed Off button is pressed, also switch the light to the ambi preset (like the hood's own firmware). Leave off when Home Assistant controls the light itself, e.g. with Layers."
+        }
+      }
+    }
+  },
   "entity": {
     "fan": {
       "extractor_fan": {

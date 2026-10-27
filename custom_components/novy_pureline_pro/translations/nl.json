@@ -29,6 +29,19 @@
       "not_supported": "Dit apparaat is geen ondersteunde Novy Pureline Pro."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Novy Pureline Pro opties",
+        "data": {
+          "ambi_on_delayed_off": "Licht naar sfeerstand bij Uitgesteld uitschakelen"
+        },
+        "data_description": {
+          "ambi_on_delayed_off": "Zet bij Uitgesteld uitschakelen ook het licht naar de sfeerstand (zoals de firmware van de dampkap zelf doet). Laat uit als Home Assistant het licht zelf stuurt, bv. met Layers."
+        }
+      }
+    }
+  },
   "entity": {
     "fan": {
       "extractor_fan": {

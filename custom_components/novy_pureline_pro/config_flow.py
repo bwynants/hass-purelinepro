@@ -12,10 +12,20 @@ from homeassistant.components.bluetooth import (
     BluetoothServiceInfoBleak,
     async_discovered_service_info,
 )
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_ADDRESS
+from homeassistant.core import callback
 
-from .const import UART_SERVICE_UUID
+from .const import (
+    CONF_AMBI_ON_DELAYED_OFF,
+    DEFAULT_AMBI_ON_DELAYED_OFF,
+    UART_SERVICE_UUID,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,6 +77,12 @@ class PurelineProConfigFlow(ConfigFlow, domain="novy_pureline_pro"):
 
     def __init__(self) -> None:
         self._discovered_address: str | None = None
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> PurelineProOptionsFlow:
+        """Return the options flow (Configure button on the integration)."""
+        return PurelineProOptionsFlow()
 
     # ------------------------------------------------------------------
     # Automatic Bluetooth discovery (passive, triggered by HA)
@@ -192,4 +208,32 @@ class PurelineProConfigFlow(ConfigFlow, domain="novy_pureline_pro"):
             step_id="manual",
             data_schema=vol.Schema({vol.Required(CONF_ADDRESS): str}),
             errors=errors,
+        )
+
+
+class PurelineProOptionsFlow(OptionsFlow):
+    """Options: behaviour toggles that do not need a reload.
+
+    The entities read ``entry.options`` at the moment they act, so saving the
+    form is enough; the entry is not reloaded.
+    """
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_AMBI_ON_DELAYED_OFF,
+                        default=self.config_entry.options.get(
+                            CONF_AMBI_ON_DELAYED_OFF, DEFAULT_AMBI_ON_DELAYED_OFF
+                        ),
+                    ): bool,
+                }
+            ),
         )

@@ -109,7 +109,7 @@ The light (combines white/ambient), supports color and brightness control.
 Useful remote-like actions:
   
 - `power`: simulates power of remote
-- `delayed_off`: if clicked it sets the fan to 25% and puts it off after 5 minutes
+- `delayed_off`: if clicked it sets the fan to 25% and puts it off after 5 minutes. Switching the light to the ambi preset at the same time (what the hood's own firmware does) is optional: enable **Switch light to ambi on Delayed Off** under the integration's **Configure** options. It is off by default so that Home Assistant stays in control of the light.
 - `set_default_light`: sets default light for ambi or white, if ambi or white mode is not active it does nothing....
 - `ambi_light`: start ambi light mode
 - `white_light`: start white light mode
