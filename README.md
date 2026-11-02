@@ -109,7 +109,12 @@ The light (combines white/ambient), supports color and brightness control.
 Useful remote-like actions:
   
 - `power`: simulates power of remote
-- `delayed_off`: if clicked it sets the fan to 25% and puts it off after 5 minutes. Switching the light to the ambi preset at the same time (what the hood's own firmware does) is optional: enable **Switch light to ambi on Delayed Off** under the integration's **Configure** options. It is off by default so that Home Assistant stays in control of the light.
+- `delayed_off`: lowers the fan to the stored switch-off speed (25% by default, see `set_default_speed`) and starts a countdown that switches the fan off when it expires: 5 minutes normally, 30 minutes in recirculate mode. The remaining time is shown by the `off_timer` sensor. The countdown is cancelled, leaving the fan running, when:
+  - the fan speed is raised above the switch-off speed, from the hood's buttons, the Novy app or Home Assistant;
+  - the fan is switched off by other means;
+  - the hood's own stop timer becomes active.
+
+  Switching the light to the ambi preset at the same time (what the hood's own firmware does) is optional: enable **Switch light to ambi on Delayed Off** under the integration's **Configure** options. It is off by default so that Home Assistant stays in control of the light.
 - `set_default_light`: sets default light for ambi or white, if ambi or white mode is not active it does nothing....
 - `ambi_light`: start ambi light mode
 - `white_light`: start white light mode

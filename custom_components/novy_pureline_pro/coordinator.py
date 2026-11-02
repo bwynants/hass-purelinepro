@@ -66,6 +66,11 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Software auto-off countdown (mirrors C++ auto_off_timer_).
         self._auto_off_task: asyncio.Task[None] | None = None
+        # Fan speed the countdown runs at (the switch-off speed). A later
+        # increase means someone wants the hood back at full strength (hood
+        # buttons, app or HA), so the countdown is dropped instead of
+        # switching the fan off under their hands.
+        self._auto_off_speed: int | None = None
 
     # ------------------------------------------------------------------
     # DataUpdateCoordinator hooks
@@ -186,9 +191,7 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def disconnect(self) -> None:
         """Disconnect BLE and cancel any pending software auto-off countdown."""
-        if self._auto_off_task and not self._auto_off_task.done():
-            self._auto_off_task.cancel()
-            self._auto_off_task = None
+        self._cancel_auto_off("disconnect")
         await self._client.disconnect()
 
     async def send_command(self, cmd_id: int, *args: int) -> None:
@@ -204,21 +207,36 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _on_state_update(self, state: dict[str, Any]) -> None:
         """Merge incoming state and notify all HA entities."""
+        previous_speed = self.data.get("fan_speed")
         self.data.update(state)
         # Cancel software auto-off if the hood's own stop-timer became active
-        # (C++ comment: "we can not have 2 timers running") or if the fan
-        # has been turned off by other means.
+        # (C++ comment: "we can not have 2 timers running"), if the fan has
+        # been turned off by other means, or if the fan speed was raised
+        # above the countdown speed: whoever did that (hood buttons, app, HA)
+        # wants the hood running, the countdown must not switch it off.
         if self._auto_off_task and not self._auto_off_task.done():
             device_timer_active = state.get("stopping") and state.get("timer_seconds", 0) > 0
             fan_is_off = state.get("fan_state") is False
-            if device_timer_active or fan_is_off:
-                _LOGGER.debug("Auto-off cancelled (device_timer=%s fan_off=%s)", device_timer_active, fan_is_off)
-                self._auto_off_task.cancel()
-                self._auto_off_task = None
-                self.data["auto_off_seconds"] = 0
+            # A real increase versus the last known speed is required: the
+            # first status packet after the Delayed Off button may still
+            # carry the pre-countdown (higher) speed, and that must not
+            # cancel the countdown it belongs to.
+            new_speed = state.get("fan_speed")
+            speed_raised = (
+                new_speed is not None
+                and previous_speed is not None
+                and self._auto_off_speed is not None
+                and new_speed > previous_speed
+                and new_speed > self._auto_off_speed
+            )
+            if device_timer_active or fan_is_off or speed_raised:
+                self._cancel_auto_off(
+                    f"device_timer={device_timer_active} fan_off={fan_is_off} "
+                    f"speed_raised={speed_raised} ({previous_speed}->{new_speed})"
+                )
         self.async_set_updated_data(self.data)
 
-    def start_auto_off(self, duration_seconds: int) -> None:
+    def start_auto_off(self, duration_seconds: int, speed: int | None = None) -> None:
         """Start (or restart) the software delayed-off countdown.
 
         Runs a background task that ticks down every second, updates
@@ -228,13 +246,27 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         Args:
             duration_seconds: Countdown length (300 s normally, 1800 s in
                 recirculate mode — matches C++ 5 / 30 min logic).
+            speed: Fan speed the countdown runs at. A later increase above
+                it cancels the countdown (see ``_on_state_update``). None
+                keeps the old behaviour: only fan-off or the device timer
+                cancel it.
         """
         if self._auto_off_task and not self._auto_off_task.done():
             self._auto_off_task.cancel()
+        self._auto_off_speed = speed
         self._auto_off_task = self.hass.async_create_task(
             self._auto_off_countdown(duration_seconds),
             name=f"purelinepro_auto_off_{self._address}",
         )
+
+    def _cancel_auto_off(self, reason: str) -> None:
+        """Drop a running software countdown, if any, without touching the fan."""
+        if self._auto_off_task and not self._auto_off_task.done():
+            _LOGGER.debug("Auto-off cancelled (%s)", reason)
+            self._auto_off_task.cancel()
+        self._auto_off_task = None
+        self._auto_off_speed = None
+        self.data["auto_off_seconds"] = 0
 
     async def _auto_off_countdown(self, duration_seconds: int) -> None:
         """Countdown coroutine: ticks every second and turns the fan off at 0."""
@@ -249,9 +281,11 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.info("Auto-off timer expired — turning fan off")
             self.data["auto_off_seconds"] = 0
             self.async_set_updated_data(self.data)
+            self._auto_off_speed = None
             await self.send_command(CMD_FAN_STATE, 1, 0)
             await self.send_command(CMD_HOOD_STATUS, 0)
         except asyncio.CancelledError:
+            self._auto_off_speed = None
             self.data["auto_off_seconds"] = 0
             self.async_set_updated_data(self.data)
             raise

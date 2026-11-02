@@ -1,7 +1,7 @@
 {
   "domain": "novy_pureline_pro",
   "name": "Novy Pureline Pro",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "documentation": "https://github.com/bwynants/hass-purelinepro",
   "issue_tracker": "https://github.com/bwynants/hass-purelinepro/issues",
   "codeowners": ["@bwynants"],

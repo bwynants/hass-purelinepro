@@ -113,9 +113,12 @@ class DelayedOffButton(_BaseButton):
 
         # Start the software countdown (only meaningful if fan is on).
         # 30 min in recirculate mode, 5 min otherwise — same as C++.
+        # The countdown remembers the speed it runs at: raising the fan
+        # above it afterwards (hood buttons, app, HA) cancels the countdown.
         if data.get("fan_state"):
             duration = 30 * 60 if data.get("recirculate") else 5 * 60
-            self.coordinator.start_auto_off(duration)
+            countdown_speed = min(data.get("fan_speed", 0), switch_off_speed)
+            self.coordinator.start_auto_off(duration, countdown_speed)
          
         await self.coordinator.send_command(CMD_HOOD_STATUS, 0)
 
