@@ -192,8 +192,10 @@ class PurelineProClient:
                 pass
             self._client = None
 
-    async def send_command(self, cmd_id: int, *args: int) -> None:
+    async def send_command(self, cmd_id: int, *args: int) -> dict[str, Any] | None:
         """Send an ASCII command frame: ``[cmd_id;arg1;arg2...]``
+
+        Returns the decoded reply (see ``_handle_notification``) or ``None``.
 
         Serialised via a write lock so that concurrent callers (poll loop +
         entity command handlers) never overlap GATT writes.
@@ -241,7 +243,7 @@ class PurelineProClient:
                 await asyncio.sleep(0.2)
 
                 # Wait for notification or timeout
-                await asyncio.wait_for(self._response_future, REQUEST_TIMEOUT_S)
+                response = await asyncio.wait_for(self._response_future, REQUEST_TIMEOUT_S)
 
             except asyncio.TimeoutError:
                 _LOGGER.debug("TX failed due to timeout for: %s", frame)
@@ -258,6 +260,8 @@ class PurelineProClient:
                 if cmd_id in HOOD_STATUS_CMDS:
                     self._pending_status_cmd = None
                 self._response_future = None  # Clean up
+
+        return response
 
 
     async def start_polling(self) -> None:
@@ -353,14 +357,20 @@ class PurelineProClient:
         now = asyncio.get_event_loop().time()
         return now - self._last_connect_attempt >= self._connect_cooldown
 
-    def _handle_notification(self, data: bytes) -> None:
-        """Route an incoming BLE payload to the correct packet parser."""
+    def _handle_notification(self, data: bytes) -> dict[str, Any]:
+        """Route an incoming BLE payload to the correct packet parser.
+
+        Returns a description of the reply, which ``send_command`` hands back
+        to its caller: ``{"type": "ack", "raw": "1;1;1"}`` for ASCII ACKs,
+        ``{"type": "status", "raw": <hex>, "state": {...}}`` for a parsed
+        status packet, ``{"type": "unknown", "raw": <hex>}`` otherwise.
+        """
 
         # ACK strings arrive as ASCII, e.g. ``[1;1;1]`` (one value per command).
         if data.startswith(b"[") and data.endswith(b"]"):
             content = data[1:-1].decode(errors="replace")
             _LOGGER.debug("ACK: [%s]", content)
-            return
+            return {"type": "ack", "raw": content}
 
         size = len(data)
         state: dict[str, Any] | None = None
@@ -392,6 +402,8 @@ class PurelineProClient:
 
         if state:
             self._on_state_update(state)
+            return {"type": "status", "raw": data.hex(), "state": state}
+        return {"type": "unknown", "raw": data.hex()}
 
     # ------------------------------------------------------------------
     # Internal — individual packet parsers

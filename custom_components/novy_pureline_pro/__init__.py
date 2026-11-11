@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
 
-from .const import PLATFORMS
+from .const import DOMAIN, PLATFORMS
 from .coordinator import PurelineProConfigEntry, PurelineProCoordinator
+from .services import async_setup_services
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register services; config entries are set up separately."""
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: PurelineProConfigEntry) -> bool:

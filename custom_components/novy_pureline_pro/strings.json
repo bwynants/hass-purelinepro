@@ -103,5 +103,46 @@
         "name": "Clean Grease Filter"
       }
     }
+  },
+  "services": {
+    "send_command": {
+      "name": "Send command",
+      "description": "Sends a raw command frame to the hood, for commands without an entity or for protocol exploration. Frame format: [command;arg1;arg2;...].",
+      "fields": {
+        "config_entry_id": {
+          "name": "Hood",
+          "description": "The Pureline Pro to send to. Can be left empty when only one hood is configured."
+        },
+        "command": {
+          "name": "Command",
+          "description": "Command ID, for example 10 (power), 28 (fan speed), 400 (status)."
+        },
+        "args": {
+          "name": "Arguments",
+          "description": "List of integer arguments, for example [1, 3]."
+        },
+        "refresh": {
+          "name": "Refresh",
+          "description": "Request a status report afterwards so the entities update."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "entry_not_found": {
+      "message": "No Novy Pureline Pro with config entry id {entry_id}."
+    },
+    "entry_not_loaded": {
+      "message": "Novy Pureline Pro {entry_id} is not loaded."
+    },
+    "no_entry_loaded": {
+      "message": "No Novy Pureline Pro is loaded."
+    },
+    "multiple_entries": {
+      "message": "Several hoods are configured; specify config_entry_id."
+    },
+    "send_command_failed": {
+      "message": "Command {command} could not be sent: {error}"
+    }
   }
 }

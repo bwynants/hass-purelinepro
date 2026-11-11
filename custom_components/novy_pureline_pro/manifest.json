@@ -1,10 +1,12 @@
 {
   "domain": "novy_pureline_pro",
   "name": "Novy Pureline Pro",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "documentation": "https://github.com/bwynants/hass-purelinepro",
   "issue_tracker": "https://github.com/bwynants/hass-purelinepro/issues",
-  "codeowners": ["@bwynants"],
+  "codeowners": [
+    "@bwynants"
+  ],
   "iot_class": "local_polling",
   "bluetooth": [
     {
@@ -20,9 +22,14 @@
       "local_name": "PurelinePro"
     }
   ],
-  "dependencies": ["bluetooth"],
+  "dependencies": [
+    "bluetooth"
+  ],
   "requirements": [],
   "config_flow": true,
   "integration_type": "device",
-  "loggers": ["novy_pureline_pro", "purelinepro_ble"]
+  "loggers": [
+    "novy_pureline_pro",
+    "purelinepro_ble"
+  ]
 }

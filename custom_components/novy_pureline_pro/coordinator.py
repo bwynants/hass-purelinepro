@@ -17,6 +17,7 @@ from homeassistant.components.bluetooth import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import CMD_HOOD_STATUS, CMD_FAN_STATE, CONF_ADDRESS, DOMAIN
@@ -200,6 +201,21 @@ class PurelineProCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._client.send_command(cmd_id, *args)
         except Exception as err:
             _LOGGER.error("send_command(%d) failed: %s", cmd_id, err)
+
+    async def async_send_raw_command(self, cmd_id: int, *args: int) -> dict[str, Any] | None:
+        """Forward a command, return the hood's reply, raise on failure.
+
+        Used by the ``send_command`` service, where the caller must see why a
+        frame was not delivered instead of only finding it in the log.
+        """
+        try:
+            return await self._client.send_command(cmd_id, *args)
+        except Exception as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="send_command_failed",
+                translation_placeholders={"command": str(cmd_id), "error": str(err)},
+            ) from err
 
     # ------------------------------------------------------------------
     # Callbacks from PurelineProClient

@@ -1,0 +1,25 @@
+send_command:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: novy_pureline_pro
+    command:
+      required: true
+      example: 400
+      selector:
+        number:
+          min: 0
+          max: 999
+          mode: box
+    args:
+      required: false
+      example: "[1, 3]"
+      selector:
+        object:
+    refresh:
+      required: false
+      default: true
+      selector:
+        boolean:
